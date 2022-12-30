@@ -1,0 +1,15 @@
+steps:
+  # Deploy the cloud function
+  - name: gcr.io/cloud-builders/gcloud
+    args: ['functions', 'deploy', 'invite_user', '--gen2', '--trigger-http', '--runtime', 'python310', '--entry-point', 'main', '--region', 'europe-west2']
+
+  # Retrieve the function URL
+  - name: gcr.io/cloud-builders/gcloud
+    args: ['functions', 'describe', 'invite_user', '--format', 'value(httpsTrigger.url)']
+    id: get-function-url
+    env:
+      - 'FUNCTION_URL=$(gsutil cat gs://$_OUTPUT_BUCKET/build-log.txt)'
+
+  # Update the cloud task with the correct function URL
+  - name: gcr.io/cloud-builders/gcloud
+    args: ['tasks', 'add-target', 'TASK_NAME', '--http-target', '$FUNCTION_URL']

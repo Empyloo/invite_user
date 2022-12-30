@@ -1,0 +1,231 @@
+import logging
+import os
+from typing import List, Optional, Tuple
+import dotenv
+import functions_framework
+import yaml
+from flask import Response
+from gotrue.types import User
+from tenacity import retry, stop_after_attempt, wait_exponential
+from supabase import Client, create_client
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
+def load_config():
+
+    with open("config.yml", encoding="utf-8", mode="r") as f:
+        config = yaml.safe_load(f)
+    return config
+
+
+def get_retry_config():
+    config = load_config()
+    return config["retry"]
+
+
+def get_redirect_url():
+    config = load_config()
+    return config["redirect_url"]
+
+
+retry_config = get_retry_config()
+REDIRECT_URL = get_redirect_url()
+
+
+def write_failed_invite(supabase_client: Client, payload: dict, error: str) -> bool:
+    """
+    Write the email: text, payload: jsonb and error: text
+    to `failed_invites` table.
+    Args:
+        supabase_client: supabase.Client
+        payload: dict
+        error: str
+    Returns:
+        bool: True if the insert operation is successful, False otherwise
+    """
+    try:
+        email = payload.get("email")
+        supabase_client.from_("failed_invites").insert(
+            {"email": email, "payload": payload, "error": error}
+        ).execute()
+        logger.info("Wrote failed invite to `failed_invites` table: %s", email)
+        return True
+    except Exception as error:
+        logger.exception(
+            "Error writing failed invite %s to `failed_invites` table: %s",
+            payload,
+            error,
+        )
+        return False
+
+
+@retry(**retry_config)
+def failed_invite(supabase_client: Client, payload: dict, error: str) -> None:
+    """
+    Handle a failed invite.
+    Args:
+        supabase_client: supabase.Client
+        payload: dict
+        error: str
+    Returns:
+        None
+    """
+    write_failed_invite(supabase_client, payload, error)
+
+
+def check_user_exists(supabase_client: Client, email: str) -> bool:
+    """
+    Check if a user with the given email already exists.
+    Args:
+        supabase_client: supabase.Client
+        email: str
+    Returns:
+        bool
+    """
+    try:
+
+        users: List[User] = supabase_client.auth.api.list_users()
+        if email in [user.email for user in users]:
+            logger.info("User %s already exists", email)
+            return True
+        logger.info("User %s does not exist", email)
+        return False
+    except Exception as error:
+        logger.exception("Error checking if user %s exists: %s", email, error)
+        raise error
+
+
+def send_invite(supabase_client: Client, payload: dict) -> None:
+    """
+    Invite the user with the given email to join the company.
+    Args:
+        supabase_client: supabase.Client
+        payload: dict
+    Returns:
+        None
+    """
+    try:
+        email = payload.get("email")
+        payload.pop("email")
+        supabase_client.auth.api.invite_user_by_email(
+            email=email, data=payload, redirect_to=REDIRECT_URL
+        )
+        logger.info("Invited user %s", email)
+    except Exception as error:
+        logger.exception("Error inviting user %s, %s, %s", email, payload, error)
+        raise error
+
+
+def invite_user(supabase_client: Client, payload: dict) -> Optional[dict]:
+    """
+    Invite the given user to join the given company,
+    return the payload if request fails.
+    Args:
+        supabase_client: supabase.Client
+        payload: dict
+    Returns:
+        dict or None
+    """
+    try:
+        email = payload.get("email")
+        if check_user_exists(supabase_client, email):
+            logger.info("User %s already exists", email)
+            return None
+        send_invite(supabase_client, payload)
+    except Exception as error:
+        logger.exception("Error inviting user payload %s: %s", payload, error)
+        return payload
+    return None
+
+
+@retry(**retry_config)
+def invite_user_with_retry(supabase_client: Client, payload: dict) -> Optional[str]:
+    """
+    Invite the given user to join the given company,
+    return the email if request fails.
+    Args:
+        supabase_client: supabase.Client
+        payload: dict
+    Returns:
+        str or None
+    """
+    failed_email = invite_user(supabase_client, payload)
+    if failed_email:
+        write_failed_invite(supabase_client, payload, "Failed to invite user")
+    return failed_email
+
+
+def create_supabase_client() -> Client:
+    """
+    Create a supabase client using the credentials stored in the environment.
+    If the .env file exists, load the credentials from it.
+    Returns:
+        supabase.Client
+    """
+    if os.path.exists(".env"):
+        dotenv.load_dotenv()
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SERVICE_ROLE_KEY")
+    supabase_client = create_client(supabase_url, supabase_key)
+    return supabase_client
+
+
+def missing_payload_values(payload: dict):
+    """Check if the payload is missing any values."""
+    missing_values = []
+    if not "email" in payload:
+        missing_values.append("email")
+    if not "company_id" in payload:
+        missing_values.append("company_id")
+    if not "company_name" in payload:
+        missing_values.append("company_name")
+    if not "role" in payload:
+        missing_values.append("role")
+    return missing_values
+
+
+def validate_request(request) -> Tuple[bool, Optional[str]]:
+    """
+    Validate the request and return a tuple indicating if the request is valid
+    and an error message if the request is invalid.
+    Args:
+        request: flask.Request
+    Returns:
+        Tuple[bool, Optional[str]]
+    """
+    if request.method != "POST":
+        return (False, "Invalid request method")
+    payload = request.get_json()
+    if not payload:
+        return (False, "Invalid request, no payload")
+    missing_values = missing_payload_values(payload)
+    if missing_values:
+        logger.error("Invalid request, missing values: %s", missing_values)
+        return (False, f"Invalid request, missing values: {missing_values}")
+    return (True, None)
+
+
+@functions_framework.http
+def main(request):
+    """
+    Cloud Function entry point, http post request with json payload,
+    containing the email and role of the user to invite a user to join.
+    Args:
+        request: flask.Request
+    Returns:
+        flask.Response
+    """
+
+    is_valid, error_msg = validate_request(request)
+    if not is_valid:
+        logger.error(error_msg)
+        return Response(error_msg, status=400)
+
+    supabase_client = create_supabase_client()
+
+    failed_email = invite_user_with_retry(supabase_client, request.get_json())
+    if failed_email:
+        return Response(f"Failed to invite user: {failed_email}", status=500)
+    return Response("Success", status=200)

@@ -1,0 +1,442 @@
+from contextlib import redirect_stderr
+from distutils.command.config import config
+import email
+import os
+import pytest
+import main
+from unittest import mock
+from supabase import Client
+from gotrue.types import User
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+
+@pytest.fixture(scope="function")
+def config_file(tmpdir):
+    config = tmpdir.join("config.yml")
+    config.write(
+        """
+        retry:
+          reraise: true
+          stop:
+            after_attempt: 3
+          wait:
+            exponential:
+              multiplier: 1
+              max: 6
+        """
+    )
+    return config
+
+
+def test_load_config(config_file):
+    current_dir = os.getcwd()
+    os.chdir(config_file.dirname)
+    config = main.load_config()
+    assert config == {
+        "retry": {
+            "reraise": True,
+            "stop": {"after_attempt": 3},
+            "wait": {"exponential": {"multiplier": 1, "max": 6}},
+        }
+    }
+    os.chdir(current_dir)
+
+
+def test_get_retry_config(config_file):
+    os.environ["CONFIG_PATH"] = str(config_file)
+    retry_config = main.get_retry_config()
+    assert retry_config == {
+        "reraise": True,
+        "stop": {"after_attempt": 3},
+        "wait": {"exponential": {"multiplier": 1, "max": 6}},
+    }
+
+
+def test_write_failed_invite():
+    mock_client = mock.Mock(spec=Client)
+    mock_client.from_("failed_invites").insert().execute.return_value = []
+    payload = {"email": "test@example.com", "custom_field": "value"}
+    error = "Error sending invite"
+    main.write_failed_invite(mock_client, payload, error)
+    mock_client.from_("failed_invites").insert.assert_called_with(
+        {"email": "test@example.com", "payload": payload, "error": error}
+    )
+
+
+def test_write_failed_invite_twice(mocker):
+    payload = {"email": "test@example.com", "name": "Test User"}
+    error = "Test error message"
+    supabase_client = mocker.Mock(spec=Client)
+    supabase_client.from_(
+        "failed_invites"
+    ).insert().return_value.execute.return_value = {"id": 1}
+    result = main.write_failed_invite(supabase_client, payload, error)
+    supabase_client.from_("failed_invites").insert.assert_called_with(
+        {"email": "test@example.com", "payload": payload, "error": error}
+    )
+    assert result is True
+
+
+def test_write_failed_invite_success(mocker):
+    payload = {"email": "test@example.com", "name": "Test User"}
+    error = "Test error message"
+    supabase_client = mocker.Mock(spec=Client)
+    supabase_client.from_("failed_invites").insert().execute.return_value = True
+    result = main.write_failed_invite(supabase_client, payload, error)
+    supabase_client.from_("failed_invites").insert.assert_called_with(
+        {"email": "test@example.com", "payload": payload, "error": error}
+    )
+    assert result == True
+
+
+def test_write_failed_invite_failure(mocker):
+    payload = {"email": "test@example.com", "name": "Test User"}
+    error = "Test error message"
+    supabase_client = mocker.Mock(spec=Client)
+    supabase_client.from_("failed_invites").insert.side_effect = Exception(
+        "Test exception"
+    )
+    result = main.write_failed_invite(supabase_client, payload, error)
+    supabase_client.from_("failed_invites").insert.assert_called_with(
+        {"email": "test@example.com", "payload": payload, "error": error}
+    )
+    assert result == False
+
+
+def test_failed_invite_success(mocker):
+    payload = {"email": "test@example.com", "name": "Test User"}
+    error = "Test error message"
+    supabase_client = mocker.Mock(spec=Client)
+    mocker.patch.object(main, "write_failed_invite", return_value=True)
+    result = main.failed_invite(supabase_client, payload, error)
+    main.write_failed_invite.assert_called_with(supabase_client, payload, error)
+    assert result is None
+
+
+def test_check_user_exists(mocker):
+    supabase_client = mocker.Mock(spec=Client)
+    supabase_client.auth = mocker.Mock()
+    supabase_client.auth.api = mocker.Mock()
+    supabase_client.auth.api.list_users.return_value = [
+        User(
+            id="123e4567-e89b-12d3-a456-426655440000",
+            email="user1@example.com",
+            app_metadata={},
+            aud="",
+            created_at="2022-12-29T00:00:00Z",
+            user_metadata={},
+        ),
+        User(
+            id="123e4567-e89b-12d3-a456-426655440000",
+            email="user2@example.com",
+            app_metadata={},
+            aud="",
+            created_at="2022-12-29T00:00:00Z",
+            user_metadata={},
+        ),
+    ]
+    assert main.check_user_exists(supabase_client, "user2@example.com") is True
+
+
+def test_check_user_exists_empty_return(mocker):
+    supabase_client = mocker.Mock(spec=Client)
+    supabase_client.auth = mocker.Mock()
+    supabase_client.auth.api = mocker.Mock()
+    supabase_client.auth.api.list_users.return_value = []
+    assert main.check_user_exists(supabase_client, "user2@example.com") is False
+
+
+def test_check_user_exists_exception(mocker):
+    supabase_client = mocker.Mock(spec=Client)
+    supabase_client.auth = mocker.Mock()
+    supabase_client.auth.api = mocker.Mock()
+    supabase_client.auth.api.list_users.side_effect = Exception("Test exception")
+    with pytest.raises(Exception):
+        main.check_user_exists(supabase_client, "user2@example.com")
+
+
+@mock.patch("main.REDIRECT_URL", "https://example.com/invite")
+def test_send_invite_success(mocker):
+    payload = {
+        "email": "user@example.com",
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+    }
+    supabase_client = mocker.Mock(spec=Client)
+    supabase_client.auth = mocker.Mock()
+    supabase_client.auth.api = mocker.Mock()
+    supabase_client.auth.api.invite_user_by_email.return_value = True
+    main.send_invite(supabase_client, payload)
+    supabase_client.auth.api.invite_user_by_email.assert_called_with(
+        email="user@example.com",
+        redirect_to="https://example.com/invite",
+        data={
+            "company_name": "Test Company",
+            "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+            "role": "member",
+        },
+    )
+
+
+@mock.patch("main.REDIRECT_URL", "https://example.com/invite")
+def test_send_invite_failure(mocker):
+    payload = {
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+    }
+    supabase_client = mocker.Mock(spec=Client)
+    supabase_client.auth = mocker.Mock()
+    supabase_client.auth.api = mocker.Mock()
+    supabase_client.auth.api.invite_user_by_email.side_effect = Exception(
+        "Test exception"
+    )
+    with pytest.raises(Exception):
+        main.send_invite(supabase_client, payload)
+
+
+@mock.patch("main.REDIRECT_URL", "https://example.com/invite")
+@mock.patch("main.check_user_exists", return_value=True)
+@mock.patch("main.send_invite")
+def test_invite_user_new_user(mock_send_invite, mock_check_user_exists, mocker):
+    payload = {
+        "email": "user@example.com",
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+    }
+    supabase_client = mocker.Mock(spec=Client)
+    supabase_client.auth = mocker.Mock()
+    supabase_client.auth.api = mocker.Mock()
+    mock_check_user_exists.return_value = False
+    mock_send_invite.return_value = None
+    assert main.invite_user(supabase_client, payload) is None
+
+
+@mock.patch("main.REDIRECT_URL", "https://example.com/invite")
+@mock.patch("main.check_user_exists", return_value=True)
+@mock.patch("main.send_invite")
+def test_invite_user_user_exists(mock_send_invite, mock_check_user_exists, mocker):
+    payload = {
+        "email": "user@example.com",
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+    }
+    supabase_client = mocker.Mock(spec=Client)
+    supabase_client.auth = mocker.Mock()
+    supabase_client.auth.api = mocker.Mock()
+    mock_check_user_exists.return_value = True
+    assert main.invite_user(supabase_client, payload) is None
+
+
+@mock.patch("main.REDIRECT_URL", "https://example.com/invite")
+@mock.patch("main.check_user_exists", return_value=True)
+@mock.patch("main.send_invite")
+def test_invite_user_send_invite_exception(
+    mock_send_invite, mock_check_user_exists, mocker
+):
+    payload = {
+        "email": "user@example.com",
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+    }
+    supabase_client = mocker.Mock(spec=Client)
+    supabase_client.auth = mocker.Mock()
+    supabase_client.auth.api = mocker.Mock()
+    mock_check_user_exists.return_value = False
+    mock_send_invite.side_effect = Exception("Test exception")
+    result = main.invite_user(supabase_client, payload)
+    assert result == payload
+
+
+@mock.patch("main.invite_user", return_value=None)
+@mock.patch("main.write_failed_invite")
+def test_invite_user_with_retry_success(
+    mock_write_failed_invites, mock_invite_user, mocker
+):
+    payload = {
+        "email": "user@example.com",
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+    }
+    supabase_client = mocker.Mock(spec=Client)
+    mock_invite_user.return_value = None
+    assert main.invite_user_with_retry(supabase_client, payload) is None
+
+
+@mock.patch("main.invite_user", return_value=None)
+@mock.patch("main.write_failed_invite")
+def test_invite_user_with_retry_failure(
+    mock_write_failed_invites, mock_invite_user, mocker
+):
+    payload = {
+        "email": "user@example.com",
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+    }
+    supabase_client = mocker.Mock(spec=Client)
+    mock_invite_user.return_value = payload
+    assert mock_write_failed_invites.called_once_with(
+        supabase_client, payload, "Failed to invite user."
+    )
+
+
+def test_create_supabase_client(mocker):
+    dotenv_mock = mocker.patch("dotenv.load_dotenv")
+    os_mock = mocker.patch("os.path.exists")
+    os_mock.return_value = True
+    os.environ["SUPABASE_URL"] = "test_url"
+    os.environ["SUPABASE_KEY"] = "test_key"
+    mock_supabase_client = mocker.Mock(spec=Client)
+    mocker.patch("main.create_client", return_value=mock_supabase_client)
+    assert main.create_supabase_client() == mock_supabase_client
+
+
+def test_missing_payload_values_success():
+    payload = {
+        "email": "user@example.com",
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+    }
+    assert main.missing_payload_values(payload) == []
+
+
+def test_missing_payload_values_missing_email():
+    payload = {
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+    }
+    assert main.missing_payload_values(payload) == ["email"]
+
+
+def test_missing_payload_values_missing_company_id():
+    payload = {
+        "email": "user@example.com",
+        "company_name": "Test Company",
+        "role": "member",
+    }
+    assert main.missing_payload_values(payload) == ["company_id"]
+
+
+def test_missing_payload_values_missing_company_name():
+    payload = {
+        "email": "user@example.com",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+    }
+    assert main.missing_payload_values(payload) == ["company_name"]
+
+
+def test_missing_payload_values_missing_role():
+    payload = {
+        "email": "user@example.com",
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+    }
+    assert main.missing_payload_values(payload) == ["role"]
+
+
+def test_validate_request_success(mocker):
+    request = mocker.Mock()
+    request.method = "POST"
+    request.get_json.return_value = {
+        "email": "test_user@work.com",
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+    }
+    assert main.validate_request(request) == (True, None)
+
+
+def test_validate_request_invalid_method(mocker):
+    request = mocker.Mock()
+    request.method = "GET"
+    request.get_json.return_value = {
+        "email": "test_user@work.com",
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+    }
+    assert main.validate_request(request) == (False, "Invalid request method")
+
+
+def test_validate_request_invalid_payload(mocker):
+    request = mocker.Mock()
+    request.method = "POST"
+    request.get_json.return_value = None
+    assert main.validate_request(request) == (False, "Invalid request, no payload")
+
+
+def test_validate_request_missing_values(mocker):
+    request = mocker.Mock()
+    request.method = "POST"
+    request.get_json.return_value = {
+        "email": "test_user@work.com",
+        "company_name": "Test Company",
+        "role": "member",
+    }
+    assert main.validate_request(request) == (
+        False,
+        "Invalid request, missing values: ['company_id']",
+    )
+
+
+def test_main_success(mocker):
+    request = mocker.Mock()
+    request.method = "POST"
+    request.get_json.return_value = {
+        "email": "test_user@work.com",
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+    }
+    mock_validate_request = mocker.patch("main.validate_request")
+    mock_validate_request.return_value = (True, None)
+    mock_create_supabase_client = mocker.patch("main.create_supabase_client")
+    mock_invite_user_with_retry = mocker.patch("main.invite_user_with_retry")
+    mock_invite_user_with_retry.return_value = None
+    response = main.main(request)
+    assert response.status_code == 200
+    assert response.data == b"Success"
+
+
+def test_main_invalid_request(mocker):
+    request = mocker.Mock()
+    request.method = "POST"
+    request.get_json.return_value = {
+        "email": "test_user@work.com",
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+    }
+    mock_validate_request = mocker.patch("main.validate_request")
+    mock_validate_request.return_value = (False, "Invalid request")
+    response = main.main(request)
+    assert response.status_code == 400
+    assert response.data == b"Invalid request"
+
+
+def test_main_invite_user_failed(mocker):
+    request = mocker.Mock()
+    request.method = "POST"
+    request.get_json.return_value = {
+        "email": "test_user@work.com",
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+    }
+    mock_validate_request = mocker.patch("main.validate_request")
+    mock_validate_request.return_value = (True, None)
+    mock_create_supabase_client = mocker.patch("main.create_supabase_client")
+    mock_invite_user_with_retry = mocker.patch("main.invite_user_with_retry")
+    mock_invite_user_with_retry.return_value = "test_user@work.com"
+    response = main.main(request)
+    assert response.status_code == 500
+    assert response.data == b"Failed to invite user: test_user@work.com"
