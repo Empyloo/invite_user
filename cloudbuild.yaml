@@ -27,7 +27,7 @@ steps:
     args: ['functions', 'describe', 'invite-user-function', '--format', 'value(httpsTrigger.url)']
     id: get-function-url
     env:
-      - 'FUNCTION_URL=$(gsutil cat gs://$_OUTPUT_BUCKET/build-log.txt)'
+      - '_FUNCTION_URL=$(gsutil cat gs://$_OUTPUT_BUCKET/build-log.txt)'
     waitFor: ['deploy-function']
 
   # Create or update the task queue
@@ -37,4 +37,4 @@ steps:
     entrypoint: 'bash'
     args:
       - -c
-      - echo $FUNCTION_URL
+      - echo $_FUNCTION_URL
