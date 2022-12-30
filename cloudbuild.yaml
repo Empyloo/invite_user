@@ -24,7 +24,7 @@ steps:
 
   # Retrieve the function URL
   - name: gcr.io/cloud-builders/gcloud
-    args: ['functions', 'describe', 'invite-user-function', '--format', 'value(httpsTrigger.url)']
+    args: ['functions', 'describe', 'invite-user-function', '--gen2', '--region=europe-west2', '--format=value(serviceConfig.url)']
     id: get-function-url
     env:
       - '_FUNCTION_URL=$(gsutil cat gs://$_OUTPUT_BUCKET/build-log.txt)'
