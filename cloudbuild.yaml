@@ -6,7 +6,6 @@ steps:
       - 'SUPABASE_URL=${_SUPABASE_URL}'
       - 'SERVICE_ROLE_KEY=${_SERVICE_ROLE_KEY}'
     args:
-      - gcloud
       - functions
       - deploy
       - invite-user-function
