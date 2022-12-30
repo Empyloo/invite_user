@@ -1,6 +1,7 @@
 steps:
   # Deploy the cloud function
   - name: gcr.io/cloud-builders/gcloud
+    id: deploy-function
     env:
       - 'SUPABASE_URL=${_SUPABASE_URL}'
       - 'SERVICE_ROLE_KEY=${_SERVICE_ROLE_KEY}'
