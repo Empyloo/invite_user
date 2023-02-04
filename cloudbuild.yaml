@@ -6,11 +6,9 @@ steps:
     args:
       - -c
       - |
-        python -m venv venv
-        source venv/bin/activate
-        pip install -r requirements.txt
-        pip install -r requirements-dev.txt
-        python -m pytest
+        python -m pip install -r requirements.txt
+        python -m pip install -r requirements-dev.txt
+        python -m pytest -vv
   # Deploy the cloud function
   - name: gcr.io/cloud-builders/gcloud
     id: deploy-function
