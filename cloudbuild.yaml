@@ -1,8 +1,8 @@
 steps:
   # Tests
-  - name: gcr.io/cloud-builders/gcloud
-    id: test
-    entrypoint: bash
+  - name: python
+    id: 'Test'
+    entrypoint: 'bash'
     args:
       - -c
       - |
