@@ -219,7 +219,7 @@ def main(request):
     Returns:
         flask.Response
     """
-
+    logger.info("Starting invite user function")
     is_valid, error_msg = validate_request(request)
     if not is_valid:
         logger.error(error_msg)
