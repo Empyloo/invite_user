@@ -170,6 +170,7 @@ def create_supabase_client() -> Client:
     supabase_url = os.getenv("SUPABASE_URL")
     supabase_key = os.getenv("SERVICE_ROLE_KEY")
     supabase_client = create_client(supabase_url, supabase_key)
+    logger.info("Created supabase client")
     return supabase_client
 
 
@@ -187,7 +188,7 @@ def missing_payload_values(payload: dict):
     return missing_values
 
 
-def validate_request(request) -> Tuple[bool, Optional[str]]:
+def validate_request(request) -> Tuple[bool, Optional[str|dict]]:
     """
     Validate the request and return a tuple indicating if the request is valid
     and an error message if the request is invalid.
@@ -208,11 +209,10 @@ def validate_request(request) -> Tuple[bool, Optional[str]]:
     if not payload:
         return (False, "Invalid request, no payload")
     missing_values = missing_payload_values(payload)
-    logger.error("Missing values: %s" % missing_values)
     if missing_values:
         logger.error("Invalid request, missing values: %s", missing_values)
         return (False, f"Invalid request, missing values: {missing_values}")
-    return (True, None)
+    return (True, payload)
 
 
 @functions_framework.http
@@ -226,14 +226,14 @@ def main(request):
         flask.Response
     """
     logger.info("Starting invite user function")
-    is_valid, error_msg = validate_request(request)
+    is_valid, payload = validate_request(request)
     if not is_valid:
-        logger.error(error_msg)
-        return Response(error_msg, status=400)
+        logger.error(payload)
+        return Response(payload, status=400)
 
     supabase_client = create_supabase_client()
 
-    failed_email = invite_user_with_retry(supabase_client, request.get_json())
+    failed_email = invite_user_with_retry(supabase_client, payload)
     if failed_email:
         return Response(f"Failed to invite user: {failed_email}", status=500)
     return Response("Success", status=200)

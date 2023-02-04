@@ -1,4 +1,15 @@
 steps:
+  # Tests
+  - name: gcr.io/cloud-builders/gcloud
+    id: test
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        python -m venv venv
+        source venv/bin/activate
+        pip install -r requirements.txt
+        python -m pytest
   # Deploy the cloud function
   - name: gcr.io/cloud-builders/gcloud
     id: deploy-function

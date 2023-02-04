@@ -357,7 +357,15 @@ def test_validate_request_with_valid_payload(monkeypatch):
     request.get_data.return_value = converted_payload
 
     result = main.validate_request(request)
-    assert result == (True, None)
+    assert result == (
+        True,
+        {
+            "email": "test@example.com",
+            "company_id": 1,
+            "company_name": "Test Company",
+            "role": "user",
+        },
+    )
 
 
 def test_validate_request_with_invalid_method(monkeypatch):
