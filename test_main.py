@@ -1,7 +1,5 @@
-from contextlib import redirect_stderr
-from distutils.command.config import config
-import email
 import os
+import json
 import pytest
 import main
 from unittest import mock
@@ -343,48 +341,66 @@ def test_missing_payload_values_missing_role():
     assert main.missing_payload_values(payload) == ["role"]
 
 
-def test_validate_request_success(mocker):
-    request = mocker.Mock()
-    request.method = "POST"
-    request.get_json.return_value = {
-        "email": "test_user@work.com",
+def test_validate_request_with_valid_payload(monkeypatch):
+    monkeypatch.setattr("main.missing_payload_values", lambda payload: [])
+
+    payload = {
+        "email": "test@example.com",
+        "company_id": 1,
         "company_name": "Test Company",
-        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
-        "role": "member",
+        "role": "user",
     }
-    assert main.validate_request(request) == (True, None)
+    converted_payload = json.dumps(payload).encode()
+
+    request = mock.MagicMock()
+    request.method = "POST"
+    request.get_data.return_value = converted_payload
+
+    result = main.validate_request(request)
+    assert result == (True, None)
 
 
-def test_validate_request_invalid_method(mocker):
-    request = mocker.Mock()
+def test_validate_request_with_invalid_method(monkeypatch):
+    monkeypatch.setattr("main.missing_payload_values", lambda payload: [])
+
+    request = mock.MagicMock()
     request.method = "GET"
-    request.get_json.return_value = {
-        "email": "test_user@work.com",
-        "company_name": "Test Company",
-        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
-        "role": "member",
-    }
-    assert main.validate_request(request) == (False, "Invalid request method")
+
+    result = main.validate_request(request)
+    assert result == (False, "Invalid request method")
 
 
-def test_validate_request_invalid_payload(mocker):
-    request = mocker.Mock()
+def test_validate_request_with_empty_payload(monkeypatch):
+
+    monkeypatch.setattr("main.missing_payload_values", lambda payload: [])
+
+    request = mock.MagicMock()
     request.method = "POST"
-    request.get_json.return_value = None
-    assert main.validate_request(request) == (False, "Invalid request, no payload")
+    request.get_data.return_value = b""
+
+    result = main.validate_request(request)
+    assert result == (False, "Invalid request, no payload")
 
 
-def test_validate_request_missing_values(mocker):
-    request = mocker.Mock()
-    request.method = "POST"
-    request.get_json.return_value = {
-        "email": "test_user@work.com",
-        "company_name": "Test Company",
-        "role": "member",
+def test_validate_request_with_missing_payload_values(monkeypatch):
+    monkeypatch.setattr(
+        "main.missing_payload_values", lambda payload: ["company_id", "company_name"]
+    )
+
+    payload = {
+        "email": "test@example.com",
+        "role": "user",
     }
-    assert main.validate_request(request) == (
+    converted_payload = json.dumps(payload).encode()
+
+    request = mock.MagicMock()
+    request.method = "POST"
+    request.get_data.return_value = converted_payload
+
+    result = main.validate_request(request)
+    assert result == (
         False,
-        "Invalid request, missing values: ['company_id']",
+        "Invalid request, missing values: ['company_id', 'company_name']",
     )
 
 

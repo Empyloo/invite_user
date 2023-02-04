@@ -1,5 +1,6 @@
-import logging
 import os
+import json
+import logging
 from typing import List, Optional, Tuple
 import dotenv
 import functions_framework
@@ -197,7 +198,12 @@ def validate_request(request) -> Tuple[bool, Optional[str]]:
     """
     if request.method != "POST":
         return (False, "Invalid request method")
-    payload = request.get_json().decode("utf-8")
+    payload = request.get_data().decode("utf-8")
+    try:
+        payload = json.loads(payload)
+    except json.decoder.JSONDecodeError:
+        logger.error("Invalid request: %s" % payload)
+        return (False, "Invalid request, no payload")
     logger.debug("Payload: %s" % payload)
     if not payload:
         return (False, "Invalid request, no payload")
