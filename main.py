@@ -10,7 +10,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from supabase import Client, create_client
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.ERROR)
 
 
 def load_config():
