@@ -197,10 +197,12 @@ def validate_request(request) -> Tuple[bool, Optional[str]]:
     """
     if request.method != "POST":
         return (False, "Invalid request method")
-    payload = request.get_json()
+    payload = request.get_json().decode("utf-8")
+    logger.debug("Payload: %s" % payload)
     if not payload:
         return (False, "Invalid request, no payload")
     missing_values = missing_payload_values(payload)
+    logger.error("Missing values: %s" % missing_values)
     if missing_values:
         logger.error("Invalid request, missing values: %s", missing_values)
         return (False, f"Invalid request, missing values: {missing_values}")
