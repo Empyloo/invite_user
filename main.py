@@ -9,13 +9,13 @@ from flask import Response
 from gotrue.types import User
 from tenacity import retry, stop_after_attempt, wait_exponential
 from supabase import Client, create_client
+from user_service import UserService
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
 def load_config():
-
     with open("config.yml", encoding="utf-8", mode="r") as f:
         config = yaml.safe_load(f)
     return config
@@ -86,7 +86,6 @@ def check_user_exists(supabase_client: Client, email: str) -> bool:
         bool
     """
     try:
-
         users: List[User] = supabase_client.auth.api.list_users()
         if email in [user.email for user in users]:
             logger.info("User %s already exists", email)
@@ -119,29 +118,32 @@ def send_invite(supabase_client: Client, payload: dict) -> None:
         raise error
 
 
-def invite_user(supabase_client: Client, payload: dict) -> Optional[dict]:
+def invite_user(user_service: UserService, payload: dict) -> Optional[dict]:
     """
     Invite the given user to join the given company,
     return the payload if request fails.
     Args:
-        supabase_client: supabase.Client
+        user_service: UserService
         payload: dict
     Returns:
         dict or None
     """
     try:
         email = payload.get("email")
-        if check_user_exists(supabase_client, email):
-            logger.info("User %s already exists", email)
-            return None
-        send_invite(supabase_client, payload)
+        payload.pop("email")
+        response = user_service.invite_user_by_email(email, payload, REDIRECT_URL)
+        print(response.json())
+        if response.status_code == 422:
+            response = user_service.generate_and_send_user_link(
+                email, "recover", REDIRECT_URL
+            )
     except Exception as error:
+        payload["email"] = email
         logger.exception("Error inviting user payload %s: %s", payload, error)
         return payload
     return None
 
 
-@retry(**retry_config)
 def invite_user_with_retry(supabase_client: Client, payload: dict) -> Optional[str]:
     """
     Invite the given user to join the given company,
@@ -188,7 +190,7 @@ def missing_payload_values(payload: dict):
     return missing_values
 
 
-def validate_request(request) -> Tuple[bool, Optional[str|dict]]:
+def validate_request(request) -> Tuple[bool, Optional[str | dict]]:
     """
     Validate the request and return a tuple indicating if the request is valid
     and an error message if the request is invalid.

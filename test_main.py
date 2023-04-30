@@ -7,6 +7,13 @@ from supabase import Client
 from gotrue.types import User
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from user_service import UserService
+
+
+@pytest.fixture
+def mock_user_service():
+    return mock.Mock(spec=UserService)
+
 
 @pytest.fixture(scope="function")
 def config_file(tmpdir):
@@ -195,38 +202,59 @@ def test_send_invite_failure(mocker):
 
 
 @mock.patch("main.REDIRECT_URL", "https://example.com/invite")
-@mock.patch("main.check_user_exists", return_value=True)
-@mock.patch("main.send_invite")
-def test_invite_user_new_user(mock_send_invite, mock_check_user_exists, mocker):
+@mock.patch("main.logger")
+def test_invite_user_new_user(mock_logger, mock_user_service):
     payload = {
         "email": "user@example.com",
         "company_name": "Test Company",
         "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
         "role": "member",
     }
-    supabase_client = mocker.Mock(spec=Client)
-    supabase_client.auth = mocker.Mock()
-    supabase_client.auth.api = mocker.Mock()
-    mock_check_user_exists.return_value = False
-    mock_send_invite.return_value = None
-    assert main.invite_user(supabase_client, payload) is None
+
+    # Configure the mock response for invite_user_by_email
+    mock_response = mock.Mock()
+    mock_response.status_code = 422
+    mock_user_service.invite_user_by_email.return_value = mock_response
+
+    # Configure the mock response for generate_and_send_user_link
+    mock_response_link = mock.Mock()
+    mock_response_link.status_code = 200
+    mock_user_service.generate_and_send_user_link.return_value = mock_response_link
+
+    # Call the invite_user function with the mock UserService and payload
+    assert main.invite_user(mock_user_service, payload) is None
+
+    # Check if invite_user_by_email and generate_and_send_user_link were called with the correct arguments
+    mock_user_service.invite_user_by_email.assert_called_once_with(
+        "user@example.com", payload, "https://example.com/invite"
+    )
+    mock_user_service.generate_and_send_user_link.assert_called_once_with(
+        "user@example.com", "recover", "https://example.com/invite"
+    )
 
 
 @mock.patch("main.REDIRECT_URL", "https://example.com/invite")
-@mock.patch("main.check_user_exists", return_value=True)
-@mock.patch("main.send_invite")
-def test_invite_user_user_exists(mock_send_invite, mock_check_user_exists, mocker):
+@mock.patch("main.logger")
+def test_invite_user_user_exists(mock_logger, mock_user_service):
     payload = {
         "email": "user@example.com",
         "company_name": "Test Company",
         "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
         "role": "member",
     }
-    supabase_client = mocker.Mock(spec=Client)
-    supabase_client.auth = mocker.Mock()
-    supabase_client.auth.api = mocker.Mock()
-    mock_check_user_exists.return_value = True
-    assert main.invite_user(supabase_client, payload) is None
+
+    # Configure the mock response for invite_user_by_email
+    mock_response = mock.Mock()
+    mock_response.status_code = 200
+    mock_user_service.invite_user_by_email.return_value = mock_response
+
+    # Call the invite_user function with the mock UserService and payload
+    assert main.invite_user(mock_user_service, payload) is None
+
+    # Check if invite_user_by_email was called with the correct arguments
+    mock_user_service.invite_user_by_email.assert_called_once_with(
+        "user@example.com", payload, "https://example.com/invite"
+    )
 
 
 @mock.patch("main.REDIRECT_URL", "https://example.com/invite")
@@ -379,7 +407,6 @@ def test_validate_request_with_invalid_method(monkeypatch):
 
 
 def test_validate_request_with_empty_payload(monkeypatch):
-
     monkeypatch.setattr("main.missing_payload_values", lambda payload: [])
 
     request = mock.MagicMock()
