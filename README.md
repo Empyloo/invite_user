@@ -47,3 +47,27 @@ To run a make target, use the `make` command followed by the target name. For ex
 ```bash
 make test
 ```
+
+```
+curl -m 70 -X POST https://invite-user-function-wojn2zefia-nw.a.run.app \
+-H "Authorization: bearer $(gcloud auth print-identity-token)" \
+-H "Content-Type: application/json" \
+-d '{
+  "email": "brian.musonza@icloud.com",
+  "company_name": "Empylo",
+  "company_id": "asdfaff-6316-472d-9a36-asdfaf",
+  "role": "super_admin"
+}'
+```
+
+```
+curl -m 70 -X POST http://192.168.1.100:8080 \
+-H "Authorization: bearer $(gcloud auth print-identity-token)" \
+-H "Content-Type: application/json" \
+-d '{
+  "email": "chitiyobrian@gmail.com",
+  "company_name": "Empylo",
+  "company_id": "asdfaff-6316-472d-9a36-asdfaf",
+  "role": "user"
+}'
+```
