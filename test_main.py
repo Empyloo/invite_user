@@ -278,10 +278,11 @@ def test_invite_user_send_invite_exception(
     assert result == payload
 
 
+
 @mock.patch("main.invite_user", return_value=None)
 @mock.patch("main.write_failed_invite")
 def test_invite_user_with_retry_success(
-    mock_write_failed_invites, mock_invite_user, mocker
+    mock_write_failed_invites, mock_invite_user, mocker, mock_user_service
 ):
     payload = {
         "email": "user@example.com",
@@ -291,7 +292,7 @@ def test_invite_user_with_retry_success(
     }
     supabase_client = mocker.Mock(spec=Client)
     mock_invite_user.return_value = None
-    assert main.invite_user_with_retry(supabase_client, payload) is None
+    assert main.invite_user_with_retry(supabase_client, mock_user_service, payload) is None
 
 
 @mock.patch("main.invite_user", return_value=None)

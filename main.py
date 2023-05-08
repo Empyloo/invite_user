@@ -144,17 +144,18 @@ def invite_user(user_service: UserService, payload: dict) -> Optional[dict]:
     return None
 
 
-def invite_user_with_retry(supabase_client: Client, payload: dict) -> Optional[str]:
+def invite_user_with_retry(supabase_client: Client, user_service: UserService, payload: dict) -> Optional[str]:
     """
     Invite the given user to join the given company,
     return the email if request fails.
     Args:
         supabase_client: supabase.Client
+        user_service: UserService
         payload: dict
     Returns:
         str or None
     """
-    failed_email = invite_user(supabase_client, payload)
+    failed_email = invite_user(user_service=user_service, payload=payload)
     if failed_email:
         write_failed_invite(supabase_client, payload, "Failed to invite user")
     return failed_email
@@ -234,8 +235,11 @@ def main(request):
         return Response(payload, status=400)
 
     supabase_client = create_supabase_client()
-
-    failed_email = invite_user_with_retry(supabase_client, payload)
+    user_service = UserService(
+        base_url=os.getenv("SUPABASE_URL"),
+        api_key=os.getenv("SERVICE_ROLE_KEY"),
+    )
+    failed_email = invite_user_with_retry(supabase_client, user_service, payload)
     if failed_email:
         return Response(f"Failed to invite user: {failed_email}", status=500)
     return Response("Success", status=200)
