@@ -295,7 +295,7 @@ def test_invite_user_with_retry_success(
     assert main.invite_user_with_retry(supabase_client, mock_user_service, payload) is None
 
 
-@mock.patch("main.invite_user", return_value=None)
+@mock.patch("main.invite_user", return_value="user@example.com")
 @mock.patch("main.write_failed_invite")
 def test_invite_user_with_retry_failure(
     mock_write_failed_invites, mock_invite_user, mocker
@@ -307,7 +307,10 @@ def test_invite_user_with_retry_failure(
         "role": "member",
     }
     supabase_client = mocker.Mock(spec=Client)
-    mock_invite_user.return_value = payload
+    user_service = mocker.Mock(spec=UserService)
+    main.invite_user_with_retry(supabase_client, user_service, payload)
+
+    mock_invite_user.assert_called_once_with(user_service=user_service, payload=payload)
     mock_write_failed_invites.assert_called_once_with(
         supabase_client, payload, "Failed to invite user."
     )

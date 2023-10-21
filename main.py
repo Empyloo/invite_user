@@ -157,7 +157,7 @@ def invite_user_with_retry(supabase_client: Client, user_service: UserService, p
     """
     failed_email = invite_user(user_service=user_service, payload=payload)
     if failed_email:
-        write_failed_invite(supabase_client, payload, "Failed to invite user")
+        write_failed_invite(supabase_client, payload, "Failed to invite user.")
     return failed_email
 
 
