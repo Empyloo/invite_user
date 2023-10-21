@@ -1,7 +1,7 @@
 import pytest  # type: ignore
 import httpx  # type: ignore
 from httpx import Response
-from user_service import UserService
+from src.user_service import UserService
 
 # Replace these values with the actual base URL and API key of your Supabase instance.
 BASE_URL = "https://your-instance.supabase.co"

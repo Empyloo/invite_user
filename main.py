@@ -9,7 +9,7 @@ from flask import Response
 from gotrue.types import User
 from tenacity import retry, stop_after_attempt, wait_exponential
 from supabase import Client, create_client
-from user_service import UserService
+from src.user_service import UserService
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)

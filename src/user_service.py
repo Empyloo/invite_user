@@ -151,7 +151,7 @@ class UserService:
 
 
 if __name__ == "__main__":
-    from main import create_supabase_client, REDIRECT_URL
+    from main import REDIRECT_URL
     from dotenv import load_dotenv
     import os
 

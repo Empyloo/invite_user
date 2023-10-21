@@ -7,7 +7,7 @@ from supabase import Client
 from gotrue.types import User
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from user_service import UserService
+from src.user_service import UserService
 
 
 @pytest.fixture
