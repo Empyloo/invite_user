@@ -308,7 +308,7 @@ def test_invite_user_with_retry_failure(
     }
     supabase_client = mocker.Mock(spec=Client)
     mock_invite_user.return_value = payload
-    assert mock_write_failed_invites.called_once_with(
+    mock_write_failed_invites.called_once_with(
         supabase_client, payload, "Failed to invite user."
     )
 
