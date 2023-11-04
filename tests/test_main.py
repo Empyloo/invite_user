@@ -160,48 +160,7 @@ def test_check_user_exists_exception(mocker):
         main.check_user_exists(supabase_client, "user2@example.com")
 
 
-@mock.patch("main.REDIRECT_URL", "https://example.com/invite")
-def test_send_invite_success(mocker):
-    payload = {
-        "email": "user@example.com",
-        "company_name": "Test Company",
-        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
-        "role": "member",
-    }
-    supabase_client = mocker.Mock(spec=Client)
-    supabase_client.auth = mocker.Mock()
-    supabase_client.auth.api = mocker.Mock()
-    supabase_client.auth.api.invite_user_by_email.return_value = True
-    main.send_invite(supabase_client, payload)
-    supabase_client.auth.api.invite_user_by_email.assert_called_with(
-        email="user@example.com",
-        redirect_to="https://example.com/invite",
-        data={
-            "company_name": "Test Company",
-            "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
-            "role": "member",
-        },
-    )
-
-
-@mock.patch("main.REDIRECT_URL", "https://example.com/invite")
-def test_send_invite_failure(mocker):
-    payload = {
-        "company_name": "Test Company",
-        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
-        "role": "member",
-    }
-    supabase_client = mocker.Mock(spec=Client)
-    supabase_client.auth = mocker.Mock()
-    supabase_client.auth.api = mocker.Mock()
-    supabase_client.auth.api.invite_user_by_email.side_effect = Exception(
-        "Test exception"
-    )
-    with pytest.raises(Exception):
-        main.send_invite(supabase_client, payload)
-
-
-@mock.patch("main.REDIRECT_URL", "https://example.com/invite")
+@mock.patch("main.REDIRECT_URL_BASE", "https://example.com/invite")
 @mock.patch("main.logger")
 def test_invite_user_new_user(mock_logger, mock_user_service):
     payload = {
@@ -209,6 +168,7 @@ def test_invite_user_new_user(mock_logger, mock_user_service):
         "company_name": "Test Company",
         "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
         "role": "member",
+        "redirect_to": "/path",
     }
 
     # Configure the mock response for invite_user_by_email
@@ -226,14 +186,14 @@ def test_invite_user_new_user(mock_logger, mock_user_service):
 
     # Check if invite_user_by_email and generate_and_send_user_link were called with the correct arguments
     mock_user_service.invite_user_by_email.assert_called_once_with(
-        "user@example.com", payload, "https://example.com/invite"
+        "user@example.com", payload
     )
     mock_user_service.generate_and_send_user_link.assert_called_once_with(
-        "user@example.com", "recover", "https://example.com/invite"
+        "user@example.com", "recover"
     )
 
 
-@mock.patch("main.REDIRECT_URL", "https://example.com/invite")
+@mock.patch("main.REDIRECT_URL_BASE", "https://example.com/invite")
 @mock.patch("main.logger")
 def test_invite_user_user_exists(mock_logger, mock_user_service):
     payload = {
@@ -241,6 +201,7 @@ def test_invite_user_user_exists(mock_logger, mock_user_service):
         "company_name": "Test Company",
         "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
         "role": "member",
+        "redirect_to": "/path",
     }
 
     # Configure the mock response for invite_user_by_email
@@ -253,30 +214,8 @@ def test_invite_user_user_exists(mock_logger, mock_user_service):
 
     # Check if invite_user_by_email was called with the correct arguments
     mock_user_service.invite_user_by_email.assert_called_once_with(
-        "user@example.com", payload, "https://example.com/invite"
+        "user@example.com", payload
     )
-
-
-@mock.patch("main.REDIRECT_URL", "https://example.com/invite")
-@mock.patch("main.check_user_exists", return_value=True)
-@mock.patch("main.send_invite")
-def test_invite_user_send_invite_exception(
-    mock_send_invite, mock_check_user_exists, mocker
-):
-    payload = {
-        "email": "user@example.com",
-        "company_name": "Test Company",
-        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
-        "role": "member",
-    }
-    supabase_client = mocker.Mock(spec=Client)
-    supabase_client.auth = mocker.Mock()
-    supabase_client.auth.api = mocker.Mock()
-    mock_check_user_exists.return_value = False
-    mock_send_invite.side_effect = Exception("Test exception")
-    result = main.invite_user(supabase_client, payload)
-    assert result == payload
-
 
 
 @mock.patch("main.invite_user", return_value=None)
@@ -289,10 +228,13 @@ def test_invite_user_with_retry_success(
         "company_name": "Test Company",
         "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
         "role": "member",
+        "redirect_to": "/path",
     }
     supabase_client = mocker.Mock(spec=Client)
     mock_invite_user.return_value = None
-    assert main.invite_user_with_retry(supabase_client, mock_user_service, payload) is None
+    assert (
+        main.invite_user_with_retry(supabase_client, mock_user_service, payload) is None
+    )
 
 
 @mock.patch("main.invite_user", return_value="user@example.com")
@@ -305,6 +247,7 @@ def test_invite_user_with_retry_failure(
         "company_name": "Test Company",
         "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
         "role": "member",
+        "redirect_to": "/path",
     }
     supabase_client = mocker.Mock(spec=Client)
     user_service = mocker.Mock(spec=UserService)
@@ -333,6 +276,7 @@ def test_missing_payload_values_success():
         "company_name": "Test Company",
         "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
         "role": "member",
+        "redirect_to": "/path",
     }
     assert main.missing_payload_values(payload) == []
 
@@ -342,6 +286,7 @@ def test_missing_payload_values_missing_email():
         "company_name": "Test Company",
         "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
         "role": "member",
+        "redirect_to": "/path",
     }
     assert main.missing_payload_values(payload) == ["email"]
 
@@ -351,6 +296,7 @@ def test_missing_payload_values_missing_company_id():
         "email": "user@example.com",
         "company_name": "Test Company",
         "role": "member",
+        "redirect_to": "/path",
     }
     assert main.missing_payload_values(payload) == ["company_id"]
 
@@ -360,6 +306,7 @@ def test_missing_payload_values_missing_company_name():
         "email": "user@example.com",
         "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
         "role": "member",
+        "redirect_to": "/path",
     }
     assert main.missing_payload_values(payload) == ["company_name"]
 
@@ -369,6 +316,7 @@ def test_missing_payload_values_missing_role():
         "email": "user@example.com",
         "company_name": "Test Company",
         "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "redirect_to": "/path",
     }
     assert main.missing_payload_values(payload) == ["role"]
 
@@ -381,6 +329,7 @@ def test_validate_request_with_valid_payload(monkeypatch):
         "company_id": 1,
         "company_name": "Test Company",
         "role": "user",
+        "redirect_to": "/path",
     }
     converted_payload = json.dumps(payload).encode()
 
@@ -396,6 +345,7 @@ def test_validate_request_with_valid_payload(monkeypatch):
             "company_id": 1,
             "company_name": "Test Company",
             "role": "user",
+            "redirect_to": "/path",
         },
     )
 
@@ -426,10 +376,7 @@ def test_validate_request_with_missing_payload_values(monkeypatch):
         "main.missing_payload_values", lambda payload: ["company_id", "company_name"]
     )
 
-    payload = {
-        "email": "test@example.com",
-        "role": "user",
-    }
+    payload = {"email": "test@example.com", "role": "user", "redirect_to": "/path"}
     converted_payload = json.dumps(payload).encode()
 
     request = mock.MagicMock()
@@ -451,6 +398,7 @@ def test_main_success(mocker):
         "company_name": "Test Company",
         "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
         "role": "member",
+        "redirect_to": "/path",
     }
     mock_validate_request = mocker.patch("main.validate_request")
     mock_validate_request.return_value = (True, None)
@@ -470,6 +418,7 @@ def test_main_invalid_request(mocker):
         "company_name": "Test Company",
         "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
         "role": "member",
+        "redirect_to": "/path",
     }
     mock_validate_request = mocker.patch("main.validate_request")
     mock_validate_request.return_value = (False, "Invalid request")
@@ -486,6 +435,7 @@ def test_main_invite_user_failed(mocker):
         "company_name": "Test Company",
         "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
         "role": "member",
+        "redirect_to": "/path",
     }
     mock_validate_request = mocker.patch("main.validate_request")
     mock_validate_request.return_value = (True, None)

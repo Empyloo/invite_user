@@ -21,14 +21,12 @@ class UserService:
         self,
         email: str,
         data: Optional[Dict[str, str]] = None,
-        redirect_to: Optional[str] = None,
     ) -> httpx.Response:
         """Invite a user by email.
 
         Args:
             email: The email address of the user to invite.
             data: Additional data to be sent with the invitation.
-            redirect_to: URL to redirect the user after accepting the invite.
 
         Returns:
             A response object containing the result of the operation.
@@ -36,8 +34,6 @@ class UserService:
         payload = {"email": email}
         if data:
             payload["data"] = data
-        if redirect_to:
-            payload["redirect_to"] = redirect_to
 
         return httpx.post(
             f"{self.base_url}/auth/v1/invite", headers=self.headers, json=payload
@@ -50,21 +46,17 @@ class UserService:
         self,
         email: str,
         link_type: str = "magiclink",
-        redirect_to: Optional[str] = None,
     ) -> httpx.Response:
         """Generate and send a user link.
 
         Args:
             email: The email address of the user.
             link_type: The type of link to generate (default is "magiclink").
-            redirect_to: URL to redirect the user after using the link.
 
         Returns:
             A response object containing the result of the operation.
         """
         payload = {"email": email}
-        if redirect_to:
-            payload["redirect_to"] = redirect_to
 
         return httpx.post(
             f"{self.base_url}/auth/v1/{link_type}",
@@ -137,7 +129,7 @@ class UserService:
         Returns:
             A response object containing the result of the operation.
         """
-        payload = {"email": email, "type": type} 
+        payload = {"email": email, "type": type}
         if data:
             payload["data"] = data
         if type:
@@ -146,7 +138,9 @@ class UserService:
             payload["redirect_to"] = redirect_to
 
         return httpx.post(
-            f"{self.base_url}/auth/v1/admin/generate_link", headers=self.headers, json=payload
+            f"{self.base_url}/auth/v1/admin/generate_link",
+            headers=self.headers,
+            json=payload,
         )
 
 
@@ -180,7 +174,7 @@ if __name__ == "__main__":
     except Exception as error:
         print("Error")
         print(error)
-    
+
     try:
         response = user_service.generate_invite_link(email, payload, redirect_to)
         print(response.json())

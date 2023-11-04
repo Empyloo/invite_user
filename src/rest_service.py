@@ -17,11 +17,7 @@ class RestService:
     @retry(
         wait=wait_exponential(multiplier=1, min=2, max=30), stop=stop_after_attempt(5)
     )
-    def create(
-        self,
-        table: str,
-        data: Dict[str, str]
-    ) -> httpx.Response:
+    def create(self, table: str, data: Dict[str, str]) -> httpx.Response:
         """Create a new record in the specified table.
 
         Args:
@@ -36,6 +32,7 @@ class RestService:
             headers=self.headers,
             json=data,
         )
+
 
 if __name__ == "__main__":
     from dotenv import load_dotenv

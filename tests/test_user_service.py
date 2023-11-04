@@ -15,13 +15,12 @@ def mock_response(status_code: int, content: str) -> Response:
 def test_invite_user_by_email(mocker):
     email = "someone@email.com"
     data = {"key": "value"}
-    redirect_to = "https://example.com/redirect"
 
     # Mock httpx.post
     mocker.patch("httpx.post", return_value=mock_response(200, "OK"))
 
     user_service = UserService(BASE_URL, API_KEY)
-    response = user_service.invite_user_by_email(email, data, redirect_to)
+    response = user_service.invite_user_by_email(email, data)
 
     assert response.status_code == 200
     assert response.text == "OK"
@@ -30,16 +29,16 @@ def test_invite_user_by_email(mocker):
 def test_generate_and_send_user_link(mocker):
     email = "someone@email.com"
     link_type = "magiclink"
-    redirect_to = "https://example.com/redirect"
 
     # Mock httpx.post
     mocker.patch("httpx.post", return_value=mock_response(200, "OK"))
 
     user_service = UserService(BASE_URL, API_KEY)
-    response = user_service.generate_and_send_user_link(email, link_type, redirect_to)
+    response = user_service.generate_and_send_user_link(email, link_type)
 
     assert response.status_code == 200
     assert response.text == "OK"
+
 
 def test_get_user(mocker):
     user_token = "user-token"

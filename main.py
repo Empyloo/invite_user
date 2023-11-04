@@ -26,13 +26,13 @@ def get_retry_config():
     return config["retry"]
 
 
-def get_redirect_url():
+def get_redirect_url_base():
     config = load_config()
-    return config["redirect_url"]
+    return config["redirect_url_base"]
 
 
 retry_config = get_retry_config()
-REDIRECT_URL = get_redirect_url()
+REDIRECT_URL_BASE = get_redirect_url_base()
 
 
 def write_failed_invite(supabase_client: Client, payload: dict, error: str) -> bool:
@@ -97,30 +97,9 @@ def check_user_exists(supabase_client: Client, email: str) -> bool:
         raise error
 
 
-def send_invite(supabase_client: Client, payload: dict) -> None:
-    """
-    Invite the user with the given email to join the company.
-    Args:
-        supabase_client: supabase.Client
-        payload: dict
-    Returns:
-        None
-    """
-    try:
-        email = payload.get("email")
-        payload.pop("email")
-        supabase_client.auth.api.invite_user_by_email(
-            email=email, data=payload, redirect_to=REDIRECT_URL
-        )
-        logger.info("Invited user %s", email)
-    except Exception as error:
-        logger.exception("Error inviting user %s, %s, %s", email, payload, error)
-        raise error
-
-
 def invite_user(user_service: UserService, payload: dict) -> Optional[dict]:
     """
-    Invite the given user to join the given company,
+    Invite the given user to join a company,
     return the payload if request fails.
     Args:
         user_service: UserService
@@ -131,12 +110,10 @@ def invite_user(user_service: UserService, payload: dict) -> Optional[dict]:
     try:
         email = payload.get("email")
         payload.pop("email")
-        response = user_service.invite_user_by_email(email, payload, REDIRECT_URL)
-        print(response.json())
+        payload["redirect_to"] = REDIRECT_URL_BASE + payload["redirect_to"]
+        response = user_service.invite_user_by_email(email, payload)
         if response.status_code == 422:
-            response = user_service.generate_and_send_user_link(
-                email, "recover", REDIRECT_URL
-            )
+            response = user_service.generate_and_send_user_link(email, "recover")
     except Exception as error:
         payload["email"] = email
         logger.exception("Error inviting user payload %s: %s", payload, error)
@@ -144,7 +121,9 @@ def invite_user(user_service: UserService, payload: dict) -> Optional[dict]:
     return None
 
 
-def invite_user_with_retry(supabase_client: Client, user_service: UserService, payload: dict) -> Optional[str]:
+def invite_user_with_retry(
+    supabase_client: Client, user_service: UserService, payload: dict
+) -> Optional[str]:
     """
     Invite the given user to join the given company,
     return the email if request fails.
@@ -188,6 +167,8 @@ def missing_payload_values(payload: dict):
         missing_values.append("company_name")
     if not "role" in payload:
         missing_values.append("role")
+    if not "redirect_to" in payload:
+        missing_values.append("redirect_to")
     return missing_values
 
 
