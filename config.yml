@@ -6,4 +6,4 @@ retry:
     exponential:
       multiplier: 1
       max: 6
-redirect_url_base: "https://app.empylo.com/#"
+redirect_url_base: "https://app.empylo.com/%23"
