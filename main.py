@@ -113,7 +113,12 @@ def invite_user(user_service: UserService, payload: dict) -> Optional[dict]:
         payload["redirect_to"] = REDIRECT_URL_BASE + payload["redirect_to"]
         response = user_service.invite_user_by_email(email, payload)
         if response.status_code == 422:
-            response = user_service.generate_and_send_user_link(email, "recover")
+            link_response = user_service.generate_and_send_user_link(email, "recover")
+            if link_response.status_code != 200:
+                logger.error(
+                    "Error inviting user %s, response: %s", email, link_response.json()
+                )
+                return payload
     except Exception as error:
         payload["email"] = email
         logger.exception("Error inviting user payload %s: %s", payload, error)

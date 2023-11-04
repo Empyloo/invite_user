@@ -40,7 +40,7 @@ class UserService:
         )
 
     @retry(
-        wait=wait_exponential(multiplier=1, min=2, max=30), stop=stop_after_attempt(5)
+        wait=wait_exponential(multiplier=1, min=2, max=30), stop=stop_after_attempt(3)
     )
     def generate_and_send_user_link(
         self,

@@ -236,6 +236,34 @@ def test_invite_user_with_retry_success(
         main.invite_user_with_retry(supabase_client, mock_user_service, payload) is None
     )
 
+@mock.patch("main.REDIRECT_URL_BASE", "https://example.com/invite")
+@mock.patch("main.logger")
+def test_invite_user_unexpected_status_code(mock_logger, mock_user_service):
+    email =  "user@example.com"
+    payload = {
+        "email": email,
+        "company_name": "Test Company",
+        "company_id": "5fccbf1f-cc62-47b2-906b-98b861913e8d",
+        "role": "member",
+        "redirect_to": "/path",
+    }
+
+    mock_response = mock.Mock()
+    mock_response.status_code = 422
+    mock_user_service.invite_user_by_email.return_value = mock_response
+
+    # Configure the mock response for generate_and_send_user_link
+    mock_response_link = mock.Mock()
+    mock_response_link.status_code = 429
+    mock_user_service.generate_and_send_user_link.return_value = mock_response_link
+
+    # Call the invite_user function with the mock UserService and payload
+    result = main.invite_user(mock_user_service, payload)
+
+    assert result == payload
+    mock_logger.error.assert_called_once_with(
+        "Error inviting user %s, response: %s", email, mock_response_link.json()
+    )
 
 @mock.patch("main.invite_user", return_value="user@example.com")
 @mock.patch("main.write_failed_invite")
