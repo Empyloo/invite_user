@@ -7,3 +7,4 @@ google-crc32c
 google-cloud-secret-manager
 psycopg2
 pyyaml
+git+https://github.com/Empyloo/supacrud.git

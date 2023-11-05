@@ -1,69 +1,84 @@
-import pytest  # type: ignore
-import httpx  # type: ignore
-from httpx import Response
+import pytest
+from unittest.mock import patch, MagicMock
 from src.user_service import UserService
-
-# Replace these values with the actual base URL and API key of your Supabase instance.
-BASE_URL = "https://your-instance.supabase.co"
-API_KEY = "your-api-key"
+from supacrud import Supabase, ResponseType
 
 
-def mock_response(status_code: int, content: str) -> Response:
-    return Response(status_code=status_code, text=content)
+config = {"supabase_url": "https://example.com", "supabase_key": "example_key"}
 
 
-def test_invite_user_by_email(mocker):
-    email = "someone@email.com"
-    data = {"key": "value"}
-
-    # Mock httpx.post
-    mocker.patch("httpx.post", return_value=mock_response(200, "OK"))
-
-    user_service = UserService(BASE_URL, API_KEY)
-    response = user_service.invite_user_by_email(email, data)
-
-    assert response.status_code == 200
-    assert response.text == "OK"
+mock_supabase = MagicMock(spec=Supabase)
 
 
-def test_generate_and_send_user_link(mocker):
-    email = "someone@email.com"
-    link_type = "magiclink"
-
-    # Mock httpx.post
-    mocker.patch("httpx.post", return_value=mock_response(200, "OK"))
-
-    user_service = UserService(BASE_URL, API_KEY)
-    response = user_service.generate_and_send_user_link(email, link_type)
-
-    assert response.status_code == 200
-    assert response.text == "OK"
+user_service = UserService(mock_supabase, config)
 
 
-def test_get_user(mocker):
-    user_token = "user-token"
-
-    # Mock httpx.get
-    mocker.patch("httpx.get", return_value=mock_response(200, "OK"))
-
-    user_service = UserService(BASE_URL, API_KEY)
-    response = user_service.get_user(user_token)
-
-    assert response.status_code == 200
-    assert response.text == "OK"
+ExpectedResponseType = ResponseType
 
 
-def test_update_user(mocker):
-    user_token = "user-token"
-    email = "new-email@email.com"
-    password = "new-password"
-    data = {"key": "new-value"}
+def test_invite_user_by_email():
+    mock_supabase.create.return_value = ExpectedResponseType
+    assert user_service.invite_user_by_email("test@example.com") == ExpectedResponseType
+    assert (
+        user_service.invite_user_by_email("test2@example.com", {"key": "value"})
+        == ExpectedResponseType
+    )
+    assert (
+        user_service.invite_user_by_email("test3@example.com", None)
+        == ExpectedResponseType
+    )
 
-    # Mock httpx.put
-    mocker.patch("httpx.put", return_value=mock_response(200, "OK"))
 
-    user_service = UserService(BASE_URL, API_KEY)
-    response = user_service.update_user(user_token, email, password, data)
+def test_generate_and_send_user_link():
+    mock_supabase.create.return_value = ExpectedResponseType
+    assert (
+        user_service.generate_and_send_user_link("test@example.com")
+        == ExpectedResponseType
+    )
+    assert (
+        user_service.generate_and_send_user_link("test2@example.com", "magiclink")
+        == ExpectedResponseType
+    )
+    assert (
+        user_service.generate_and_send_user_link("test3@example.com", "otherlink")
+        == ExpectedResponseType
+    )
 
-    assert response.status_code == 200
-    assert response.text == "OK"
+
+def test_get_user():
+    mock_supabase.read.return_value = ExpectedResponseType
+    assert user_service.get_user("token1") == ExpectedResponseType
+    assert user_service.get_user("token2") == ExpectedResponseType
+    assert user_service.get_user("token3") == ExpectedResponseType
+
+
+def test_update_user():
+    mock_supabase.update.return_value = ExpectedResponseType
+    assert (
+        user_service.update_user("token1", "test@example.com") == ExpectedResponseType
+    )
+    assert (
+        user_service.update_user("token2", "test2@example.com", "password")
+        == ExpectedResponseType
+    )
+    assert (
+        user_service.update_user(
+            "token3", "test3@example.com", "password", {"key": "value"}
+        )
+        == ExpectedResponseType
+    )
+
+
+def test_generate_invite_link():
+    mock_supabase.create.return_value = ExpectedResponseType
+    assert user_service.generate_invite_link("test@example.com") == ExpectedResponseType
+    assert (
+        user_service.generate_invite_link("test2@example.com", {"key": "value"})
+        == ExpectedResponseType
+    )
+    assert (
+        user_service.generate_invite_link(
+            "test3@example.com", {"key": "value"}, "http://example.com", "invite"
+        )
+        == ExpectedResponseType
+    )
