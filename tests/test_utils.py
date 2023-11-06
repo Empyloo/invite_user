@@ -17,9 +17,9 @@ def test_get_retry_config(mock_open):
     assert get_retry_config() == expected_config
 
 
-@patch("supabase.Client")
+@patch("src.utils.Supabase.create")
 def test_write_failed_invite(mock_client):
-    mock_client.insert.return_value = {"status_code": 200}
+    mock_client.return_value = {"status_code": 200}
     payload = {"email": "test@example.com"}
     error = "Test error"
     assert write_failed_invite(mock_client, payload, error) == True
