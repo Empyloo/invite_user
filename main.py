@@ -8,7 +8,7 @@ from flask import Response
 from supacrud import Supabase
 
 from src.user_service import UserService
-from src.user_utils import invite_user_with_retry
+from src.user_utils import invite_user
 from src.utils import validate_request, write_failed_invite
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,7 @@ dotenv.load_dotenv()
 config["supabase_url"] = os.getenv("SUPABASE_URL")
 config["anon_key"] = os.getenv("ANON_KEY")
 config["supabase_key"] = os.getenv("SERVICE_ROLE_KEY")
+config["db_url"] = os.getenv("DB_URL")
 
 
 @functions_framework.http
@@ -54,7 +55,7 @@ def main(request):
         client=supabase_client,
         config=config,
     )
-    failed_email = invite_user_with_retry(user_service, config, payload)
+    failed_email = invite_user(user_service, config, payload)
     if failed_email:
         write_failed_invite(supabase_client, payload, "Failed to invite user.")
         return Response(f"Failed to invite user: {failed_email}", status=500)

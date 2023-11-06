@@ -61,17 +61,22 @@ def sample_config():
         "redirect_url_base": "http://example.com",
     }
 
-
+@patch("src.get_link_type.is_password_set")
 @patch("main.validate_request")
 @patch("main.UserService")
 @patch("main.Supabase")
 def test_main_success(
-    mock_supabase, mock_user_service, mock_validate_request, mock_request, sample_config
+    mock_supabase, mock_user_service, mock_validate_request, mock_is_password_set, mock_request, sample_config
 ):
     mock_validate_request.return_value = (True, mock_request.get_json())
-    mock_user_service.return_value.invite_user_with_retry.return_value = None
+    mock_is_password_set.return_value = True
+
+    mock_user_service.return_value.invite_user.return_value = None
+    mock_user_service.return_value.generate_and_send_user_link.return_value = Mock(status_code=200)
+
     response = main(mock_request)
     assert response.status == "200 OK"
+
 
 
 @patch("main.validate_request")
@@ -88,20 +93,20 @@ def test_main_invalid_request(
 
 @patch("main.validate_request")
 @patch("main.UserService")
-@patch("main.invite_user_with_retry")
+@patch("main.invite_user")
 @patch("main.write_failed_invite")
 @patch("main.Supabase")
 def test_main_failed_invite(
     mock_supabase,
     mock_write_failed_invite,
-    mock_invite_user_with_retry,
+    mock_invite_user,
     mock_user_service,
     mock_validate_request,
     mock_request,
     sample_config,
 ):
     mock_validate_request.return_value = (True, mock_request.get_json())
-    mock_invite_user_with_retry.return_value = "test@example.com"
+    mock_invite_user.return_value = "test@example.com"
     response = main(mock_request)
     mock_write_failed_invite.assert_called_once()  # Now this should pass
     assert response.status == "500 INTERNAL SERVER ERROR"
@@ -111,11 +116,11 @@ def test_main_failed_invite(
 @patch("main.Supabase")
 @patch("main.UserService")
 @patch("main.validate_request")
-@patch("main.invite_user_with_retry")
+@patch("main.invite_user")
 @patch("main.write_failed_invite")
 def test_main_failed_invites(
     mock_write_failed_invite,
-    mock_invite_user_with_retry,
+    mock_invite_user,
     mock_validate_request,
     mock_user_service,
     mock_supabase,
@@ -123,7 +128,7 @@ def test_main_failed_invites(
     mock_request,
 ):
     mock_validate_request.return_value = (True, mock_request.get_json())
-    mock_invite_user_with_retry.return_value = "e@email.com"
+    mock_invite_user.return_value = "e@email.com"
     response = main(mock_request)
     mock_write_failed_invite.assert_called_once()
     assert response.status == "500 INTERNAL SERVER ERROR"

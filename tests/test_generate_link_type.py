@@ -1,5 +1,6 @@
 import pytest
-from src.get_link_type import generate_link_type
+from unittest.mock import patch, Mock
+from src.get_link_type import generate_link_type, resolve_link_type
 
 
 def test_generate_link_type_invite():
@@ -21,3 +22,25 @@ def test_generate_link_type_invalid():
     payload = {"redirect_to": "/invalid"}
     with pytest.raises(ValueError):
         generate_link_type(payload)
+
+
+@pytest.fixture
+def mock_is_password_set():
+    with patch("src.get_link_type.is_password_set") as mock:
+        yield mock
+
+
+def test_resolve_link_type_password_set(mock_is_password_set):
+    mock_is_password_set.return_value = True
+    assert resolve_link_type("db_url", "test@example.com", "magiclink") == "magiclink"
+
+
+def test_resolve_link_type_password_not_set(mock_is_password_set):
+    mock_is_password_set.return_value = False
+    assert resolve_link_type("db_url", "test@example.com", "magiclink") == "recover"
+
+
+def test_resolve_link_type_user_not_found(mock_is_password_set):
+    mock_is_password_set.side_effect = Exception("User not found")
+    with pytest.raises(Exception):
+        resolve_link_type("db_url", "test@example.com", "magiclink")

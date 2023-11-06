@@ -7,3 +7,4 @@ google-cloud-secret-manager
 psycopg2
 pyyaml
 git+https://github.com/Empyloo/supacrud.git
+psycopg2-binary==2.9.9
