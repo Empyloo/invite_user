@@ -46,11 +46,12 @@ def main(request):
         return Response(payload, status=400)
 
     supabase_client = Supabase(
-        base_url=os.getenv("SUPABASE_URL"),
-        service_role_key=os.getenv("SERVICE_ROLE_KEY"),
-        anon_key=os.getenv("ANON_KEY"),
+        base_url=config["supabase_url"],
+        service_role_key=config["supabase_key"],
+        anon_key=config["anon_key"],
     )
     user_service = UserService(
+        client=supabase_client,
         config=config,
     )
     failed_email = invite_user_with_retry(user_service, config, payload)

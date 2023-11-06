@@ -1,6 +1,5 @@
 tenacity
 pydantic
-supabase
 functions-framework
 python-dotenv
 google-crc32c
