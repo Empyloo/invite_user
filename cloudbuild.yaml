@@ -15,6 +15,7 @@ steps:
     env:
       - 'SUPABASE_URL=${_SUPABASE_URL}'
       - 'SERVICE_ROLE_KEY=${_SERVICE_ROLE_KEY}'
+      - 'SUPABASE_POSTGRES_CONNECTION_STRING=${_SUPABASE_POSTGRES_CONNECTION_STRING}'
     args:
       - functions
       - deploy
@@ -31,3 +32,4 @@ steps:
       - --set-env-vars=SUPABASE_URL=${_SUPABASE_URL}
       - --set-env-vars=SERVICE_ROLE_KEY=${_SERVICE_ROLE_KEY}
       - --set-env-vars=SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}
+      - --set-env-vars=SUPABASE_POSTGRES_CONNECTION_STRING=${_SUPABASE_POSTGRES_CONNECTION_STRING}
