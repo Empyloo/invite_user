@@ -27,7 +27,7 @@ dotenv.load_dotenv()
 config["supabase_url"] = os.getenv("SUPABASE_URL")
 config["anon_key"] = os.getenv("ANON_KEY")
 config["supabase_key"] = os.getenv("SERVICE_ROLE_KEY")
-config["db_url"] = os.getenv("DB_URL")
+config["db_url"] = os.getenv("SUPABASE_POSTGRES_CONNECTION_STRING")
 
 
 @functions_framework.http
