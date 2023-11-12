@@ -10,9 +10,7 @@ logger.setLevel(logging.DEBUG)
 
 
 def invite_user(
-    user_service: UserService,
-    config: dict,
-    payload: dict
+    user_service: UserService, config: dict, payload: dict
 ) -> Optional[dict]:
     """
     Invite a user to join a company, or participate in a survey/review.
@@ -30,14 +28,18 @@ def invite_user(
         payload["redirect_to"] = config["redirect_url_base"] + payload["redirect_to"]
 
         generated_link_type = generate_link_type(payload)
-        link_type = resolve_link_type(config['db_url'], email, generated_link_type)
+        link_type = resolve_link_type(config["db_url"], email, generated_link_type)
 
-        response = user_service.generate_and_send_user_link(email=email, link_type=link_type)
+        response = user_service.generate_and_send_user_link(
+            email=email, link_type=link_type
+        )
         if response.status_code == 200:
             logger.info("Successfully invited user %s", email)
             return None
         else:
-            logger.error(f"Failed to send {link_type} email to user {email}, status code: {response.status_code}")
+            logger.error(
+                f"Failed to send {link_type} email to user {email}, status code: {response.status_code}"
+            )
             return payload
     except Exception as error:
         payload["email"] = email

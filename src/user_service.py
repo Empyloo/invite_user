@@ -1,17 +1,10 @@
 from typing import Any, Dict, Optional
-from supacrud import Supabase, SupabaseError, ResponseType
+from supacrud import Supabase, ResponseType
 from tenacity import retry, wait_exponential, stop_after_attempt
 
 
 class UserService:
     def __init__(self, client: Supabase, config: dict):
-        self.base_url = config["supabase_url"]
-        self.api_key = config["supabase_key"]
-        self.headers = {
-            "apikey": self.api_key,
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
         self.config = config
         self.client = client
 
@@ -37,7 +30,7 @@ class UserService:
             payload["data"] = data
 
         return self.client.create(
-            f"{self.base_url}/auth/v1/invite", headers=self.headers, json=payload
+            "auth/v1/invite", data=payload
         )
 
     @retry(
@@ -60,23 +53,10 @@ class UserService:
         payload = {"email": email}
 
         return self.client.create(
-            f"{self.base_url}/auth/v1/{link_type}",
-            headers=self.headers,
-            json=payload,
+            url=f"auth/v1/{link_type}",
+            data=payload,
         )
 
-    def get_user(self, user_token: str) -> ResponseType:
-        """Get a user by their token.
-
-        Args:
-            user_token: The user's token.
-
-        Returns:
-            A response object containing the user's information.
-        """
-        headers = {**self.headers, "Authorization": f"Bearer {user_token}"}
-
-        return self.client.read(f"{self.base_url}/auth/v1/user", headers=headers)
 
     @retry(
         wait=wait_exponential(multiplier=1, min=2, max=30), stop=stop_after_attempt(5)
@@ -99,7 +79,8 @@ class UserService:
         Returns:
             A response object containing the result of the operation.
         """
-        headers = {**self.headers, "Authorization": f"Bearer {user_token}"}
+        add_to_headers = {"Authorization": f"Bearer {user_token}"}
+        self.client.update_headers(add_to_headers)
         payload = {}
         if email:
             payload["email"] = email
@@ -109,7 +90,7 @@ class UserService:
             payload["data"] = data
 
         return self.client.update(
-            f"{self.base_url}/auth/v1/user", headers=headers, json=payload
+            "auth/v1/user", data=payload
         )
 
     def generate_invite_link(
@@ -137,9 +118,12 @@ class UserService:
             payload["type"] = type
         if redirect_to:
             payload["redirect_to"] = redirect_to
-
+        headers = {
+            "apikey": self.config["supabase_service_key"],
+            "Authorization": f"Bearer {self.config['supabase_service_key']}"
+            }
+        self.client.update_headers(headers)
         return self.client.create(
-            f"{self.base_url}/auth/v1/admin/generate_link",
-            headers=self.headers,
-            json=payload,
+            url="auth/v1/admin/generate_link",
+            data=payload,
         )

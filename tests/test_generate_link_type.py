@@ -31,12 +31,12 @@ def mock_is_password_set():
 
 
 def test_resolve_link_type_password_set(mock_is_password_set):
-    mock_is_password_set.return_value = True
+    mock_is_password_set.return_value = "password set"
     assert resolve_link_type("db_url", "test@example.com", "magiclink") == "magiclink"
 
 
 def test_resolve_link_type_password_not_set(mock_is_password_set):
-    mock_is_password_set.return_value = False
+    mock_is_password_set.return_value = "password not set"
     assert resolve_link_type("db_url", "test@example.com", "magiclink") == "recover"
 
 

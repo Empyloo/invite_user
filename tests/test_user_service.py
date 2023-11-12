@@ -4,7 +4,7 @@ from src.user_service import UserService
 from supacrud import Supabase, ResponseType
 
 
-config = {"supabase_url": "https://example.com", "supabase_key": "example_key"}
+config = {"supabase_url": "https://example.com", "supabase_service_key": "example_key"}
 
 
 mock_supabase = MagicMock(spec=Supabase)
@@ -43,13 +43,6 @@ def test_generate_and_send_user_link():
         user_service.generate_and_send_user_link("test3@example.com", "otherlink")
         == ExpectedResponseType
     )
-
-
-def test_get_user():
-    mock_supabase.read.return_value = ExpectedResponseType
-    assert user_service.get_user("token1") == ExpectedResponseType
-    assert user_service.get_user("token2") == ExpectedResponseType
-    assert user_service.get_user("token3") == ExpectedResponseType
 
 
 def test_update_user():

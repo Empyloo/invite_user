@@ -4,6 +4,7 @@ from src.user_password_checker import is_password_set
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+
 def generate_link_type(payload: dict) -> str:
     """
     Generate the link type depending on `payload["redirect_to"]`.
@@ -42,10 +43,13 @@ def resolve_link_type(db_url: str, email: str, generated_link_type: str) -> str:
         str - The appropriate link type.
     """
     try:
-        password_set = is_password_set(db_url, email)
-        if not password_set:
+        password_status = is_password_set(db_url, email)
+        if password_status == "user not found":
+            raise Exception("User not found")
+        elif password_status == "password not set":
             return "recover"
-        return generated_link_type
+        else:
+            return generated_link_type
     except Exception as e:
         logger.error(f"Error checking if password is set for user {email}: {e}")
         raise e

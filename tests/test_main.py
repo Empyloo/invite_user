@@ -29,6 +29,7 @@ def mock_user_service(mock_supabase):
         mock_user_service_class.return_value = mock_user_service_instance
         yield mock_user_service_instance
 
+
 @pytest.fixture
 def mock_request():
     request = Mock(spec=Request)
@@ -39,10 +40,14 @@ def mock_request():
     }
     return request
 
+
 @pytest.fixture
 def mock_validate_request():
     with patch("main.validate_request") as mock_validate_request_func:
-        mock_validate_request_func.return_value = (True, {"email": "test@example.com", "role": "admin", "redirect_to": "/survey"})
+        mock_validate_request_func.return_value = (
+            True,
+            {"email": "test@example.com", "role": "admin", "redirect_to": "/survey"},
+        )
         yield mock_validate_request_func
 
 
@@ -61,22 +66,29 @@ def sample_config():
         "redirect_url_base": "http://example.com",
     }
 
+
 @patch("src.get_link_type.is_password_set")
 @patch("main.validate_request")
 @patch("main.UserService")
 @patch("main.Supabase")
 def test_main_success(
-    mock_supabase, mock_user_service, mock_validate_request, mock_is_password_set, mock_request, sample_config
+    mock_supabase,
+    mock_user_service,
+    mock_validate_request,
+    mock_is_password_set,
+    mock_request,
+    sample_config,
 ):
     mock_validate_request.return_value = (True, mock_request.get_json())
     mock_is_password_set.return_value = True
 
     mock_user_service.return_value.invite_user.return_value = None
-    mock_user_service.return_value.generate_and_send_user_link.return_value = Mock(status_code=200)
+    mock_user_service.return_value.generate_and_send_user_link.return_value = Mock(
+        status_code=200
+    )
 
     response = main(mock_request)
     assert response.status == "200 OK"
-
 
 
 @patch("main.validate_request")
@@ -88,7 +100,6 @@ def test_main_invalid_request(
     mock_validate_request.return_value = (False, "Invalid request")
     response = main(mock_request)
     assert response.status == "400 BAD REQUEST"
-
 
 
 @patch("main.validate_request")
