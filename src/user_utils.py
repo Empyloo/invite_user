@@ -29,7 +29,6 @@ def invite_user(
 
         generated_link_type = generate_link_type(payload)
         link_type = resolve_link_type(config["db_url"], email, generated_link_type)
-
         response = user_service.generate_and_send_user_link(
             email=email, link_type=link_type
         )

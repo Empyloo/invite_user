@@ -43,6 +43,6 @@ def is_password_set(db_url: str, email: str) -> str:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     db_url = os.getenv("SUPABASE_POSTGRES_CONNECTION_STRING")
-    email = "june@may.com" # os.getenv("FIRST_EMAIL")
+    email = "june@may.com"  # os.getenv("FIRST_EMAIL")
     is_set = is_password_set(db_url=db_url, email=email)
     print(f"Password set for user {email}: {is_set}")

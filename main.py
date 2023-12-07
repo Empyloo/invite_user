@@ -2,7 +2,6 @@ import os
 import logging
 
 import functions_framework
-import dotenv
 import yaml
 from flask import Response
 from supacrud import Supabase
@@ -23,10 +22,9 @@ def load_config():
 
 config = load_config()
 
-dotenv.load_dotenv()
 config["supabase_url"] = os.getenv("SUPABASE_URL")
-config["anon_key"] = os.getenv("ANON_KEY")
-config["supabase_key"] = os.getenv("SERVICE_ROLE_KEY")
+config["anon_key"] = os.getenv("SUPABASE_ANON_KEY")
+config["service_role_key"] = os.getenv("SERVICE_ROLE_KEY")
 config["db_url"] = os.getenv("SUPABASE_POSTGRES_CONNECTION_STRING")
 
 
@@ -48,8 +46,8 @@ def main(request):
 
     supabase_client = Supabase(
         base_url=config["supabase_url"],
-        service_role_key=config["supabase_key"],
-        anon_key=config["anon_key"],
+        service_role_key=config["service_role_key"],
+        anon_key=config["service_role_key"],
     )
     user_service = UserService(
         client=supabase_client,

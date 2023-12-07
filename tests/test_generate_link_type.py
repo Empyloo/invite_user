@@ -44,3 +44,8 @@ def test_resolve_link_type_user_not_found(mock_is_password_set):
     mock_is_password_set.side_effect = Exception("User not found")
     with pytest.raises(Exception):
         resolve_link_type("db_url", "test@example.com", "magiclink")
+
+
+def test_resolve_link_type_password_set_invite(mock_is_password_set):
+    mock_is_password_set.return_value = "password set"
+    assert resolve_link_type("db_url", "test@example.com", "invite") == "recover"

@@ -8,9 +8,7 @@ class UserService:
         self.config = config
         self.client = client
 
-    @retry(
-        wait=wait_exponential(multiplier=1, min=2, max=30), stop=stop_after_attempt(5)
-    )
+
     def invite_user_by_email(
         self,
         email: str,
@@ -29,13 +27,9 @@ class UserService:
         if data:
             payload["data"] = data
 
-        return self.client.create(
-            "auth/v1/invite", data=payload
-        )
+        return self.client.create("auth/v1/invite", data=payload)
 
-    @retry(
-        wait=wait_exponential(multiplier=1, min=2, max=30), stop=stop_after_attempt(3)
-    )
+
     def generate_and_send_user_link(
         self,
         email: str,
@@ -58,9 +52,6 @@ class UserService:
         )
 
 
-    @retry(
-        wait=wait_exponential(multiplier=1, min=2, max=30), stop=stop_after_attempt(5)
-    )
     def update_user(
         self,
         user_token: str,
@@ -89,9 +80,7 @@ class UserService:
         if data:
             payload["data"] = data
 
-        return self.client.update(
-            "auth/v1/user", data=payload
-        )
+        return self.client.update("auth/v1/user", data=payload)
 
     def generate_invite_link(
         self,
@@ -120,8 +109,8 @@ class UserService:
             payload["redirect_to"] = redirect_to
         headers = {
             "apikey": self.config["supabase_service_key"],
-            "Authorization": f"Bearer {self.config['supabase_service_key']}"
-            }
+            "Authorization": f"Bearer {self.config['supabase_service_key']}",
+        }
         self.client.update_headers(headers)
         return self.client.create(
             url="auth/v1/admin/generate_link",

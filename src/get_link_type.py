@@ -48,6 +48,8 @@ def resolve_link_type(db_url: str, email: str, generated_link_type: str) -> str:
             raise Exception("User not found")
         elif password_status == "password not set":
             return "recover"
+        elif password_status == "password set" and generated_link_type == "invite":
+            return "recover"
         else:
             return generated_link_type
     except Exception as e:

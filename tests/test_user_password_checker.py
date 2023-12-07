@@ -21,7 +21,10 @@ def test_is_password_set_true(mock_connect, mock_db_url, mock_email):
         mock_cursor
     )
 
-    assert is_password_set(db_url="mock_db_url", email="test@example.com") == 'password set'
+    assert (
+        is_password_set(db_url="mock_db_url", email="test@example.com")
+        == "password set"
+    )
     mock_cursor.execute.assert_called_once_with(
         "SELECT encrypted_password FROM auth.users WHERE email = %s",
         ("test@example.com",),
@@ -36,11 +39,15 @@ def test_is_password_set_false(mock_connect, mock_db_url, mock_email):
         mock_cursor
     )
 
-    assert is_password_set(db_url="mock_db_url", email="test@example.com") == 'password not set'
+    assert (
+        is_password_set(db_url="mock_db_url", email="test@example.com")
+        == "password not set"
+    )
     mock_cursor.execute.assert_called_once_with(
         "SELECT encrypted_password FROM auth.users WHERE email = %s",
         ("test@example.com",),
     )
+
 
 @patch("psycopg2.connect")
 def test_is_password_set_user_not_found(mock_connect, mock_db_url, mock_email):
@@ -54,8 +61,9 @@ def test_is_password_set_user_not_found(mock_connect, mock_db_url, mock_email):
         is_password_set(db_url="mock_db_url", email="june.may@test.com")
         mock_cursor.execute.assert_called_once_with(
             "SELECT encrypted_password FROM auth.users WHERE email = %s",
-            ("june.may@test.com" ,),
+            ("june.may@test.com",),
         )
+
 
 @patch("psycopg2.connect")
 def test_is_password_set_exception(mock_connect, mock_db_url, mock_email):

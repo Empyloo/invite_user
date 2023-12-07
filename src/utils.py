@@ -4,7 +4,6 @@ from typing import Optional, Tuple
 
 import yaml
 from supacrud import Supabase
-from tenacity import retry
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -30,9 +29,10 @@ def write_failed_invite(supabase_client: Supabase, payload: dict, error: str) ->
     """
     try:
         email = payload.get("email")
-        supabase_client.create(
+        response = supabase_client.create(
             url="rest/v1/failed_invites",
-            data={"email": email, "payload": payload, "error": error},
+            data={"email": email, "payload": payload, "reason": error},
+            full_representation=True,
         )
         logger.info("Wrote failed invite to `failed_invites` table: %s", email)
         return True
@@ -43,23 +43,6 @@ def write_failed_invite(supabase_client: Supabase, payload: dict, error: str) ->
             error,
         )
         return False
-
-
-retry_config = get_retry_config()
-
-
-@retry(**retry_config)
-def failed_invite(supabase_client: Supabase, payload: dict, error: str) -> None:
-    """
-    Handle a failed invite.
-    Args:
-        supabase_client: Supabase
-        payload: dict
-        error: str
-    Returns:
-        None
-    """
-    write_failed_invite(supabase_client, payload, error)
 
 
 def missing_payload_values(payload: dict):
